@@ -6,6 +6,7 @@ import google.generativeai as genai
 import os
 import uuid
 from typing import Dict, Any
+import requests
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import simpleSplit
@@ -30,6 +31,53 @@ app.add_middleware(
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
+
+# Real estate external API config (optional)
+REAL_ESTATE_API_KEY = os.getenv("REAL_ESTATE_API_KEY", "")
+REAL_ESTATE_API_URL = os.getenv("REAL_ESTATE_API_URL", "https://api.realestateapi.com/v1/market")
+
+
+def get_real_estate_data(zip_code: str) -> Dict[str, Any] | None:
+    """Try to fetch market data from RealEstateAPI.com (or configured URL).
+    Returns a dict with the expected fields or None on failure.
+    The function is defensive: any error returns None so the caller can fallback to mock data.
+    """
+    if not REAL_ESTATE_API_KEY:
+        return None
+
+    try:
+        # Example: GET https://api.realestateapi.com/v1/market/90210?apikey=KEY
+        url = f"{REAL_ESTATE_API_URL}/{zip_code}"
+        headers = {"Accept": "application/json"}
+        params = {"apikey": REAL_ESTATE_API_KEY}
+        resp = requests.get(url, headers=headers, params=params, timeout=6)
+        if resp.status_code != 200:
+            print(f"RealEstateAPI returned {resp.status_code}: {resp.text}")
+            return None
+        payload = resp.json()
+
+        # Map provider response to our expected shape. Adjust keys depending on real API.
+        # We'll defensively pick fields with sensible fallbacks.
+        return {
+            "Median Price": payload.get("median_price") or payload.get("medianPrice") or payload.get("median") or "$0",
+            "Days on Market": payload.get("days_on_market") or payload.get("daysOnMarket") or payload.get("dom") or 0,
+            "Inventory Months": payload.get("inventory_months") or payload.get("inventoryMonths") or payload.get("inventory") or 0,
+            "New Listings": payload.get("new_listings") or payload.get("newListings") or payload.get("new") or 0,
+            "List-to-Sale Ratio": payload.get("list_to_sale_ratio") or payload.get("listToSaleRatio") or payload.get("lts_ratio") or "0%",
+        }
+    except Exception as e:
+        print(f"Error calling RealEstateAPI for {zip_code}: {e}")
+        return None
+
+
+def get_market_data(zip_code: str) -> Dict[str, Any]:
+    """Return market data: prefer RealEstateAPI when available, otherwise fall back to mock data."""
+    # Try external provider first
+    external = get_real_estate_data(zip_code)
+    if external:
+        return external
+    # Fallback to existing mock mapping
+    return get_mock_market_data(zip_code)
 
 class ReportRequest(BaseModel):
     zip_code: str
@@ -58,7 +106,7 @@ async def generate_report(request: ReportRequest):
     if not request.zip_code:
         raise HTTPException(status_code=400, detail="ZIP code is required")
         
-    data = get_mock_market_data(request.zip_code)
+    data = get_market_data(request.zip_code)
     
     # Generate AI insights
     ai_text = "Market Summary:\nBuyer Insights:\nSeller Insights:\nRecommendations:\n(Configure GEMINI_API_KEY to see real AI insights)"
