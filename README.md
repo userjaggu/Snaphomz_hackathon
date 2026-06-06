@@ -11,6 +11,27 @@ This repo was built during the Snaphomz hackathon to show a fast, deployable dem
 
 ---
 
+## What I built (scope & status)
+
+- **Implemented**:
+	- FastAPI backend with two main routes: `POST /generate-report` and `POST /download-report` that return AI insights and a generated PDF respectively.
+	- Mock market-data layer keyed by ZIP codes (including `90210`, `10001`, `94105`, `33139`, `60611`, `02139`) and a clear fallback strategy so the demo works without external APIs.
+	- Gemini integration (optional) that uses `GEMINI_API_KEY` from `backend/.env` to produce conversational AI insights when present.
+	- PDF generation with ReportLab producing a branded, downloadable PDF containing market metrics and AI insights.
+	- Simple React (Vite) frontend to request reports, display results, and download PDFs.
+	- Probe scripts to attempt discovery of RealEstateAPI endpoint variants (used during development to try mapping the provider).
+
+- **Not implemented / deferred (time constraints)**:
+	- Production-ready RealEstateAPI integration: probes returned 404 for the attempted base URL/patterns during development, so the code currently prefers mock data and is prepared to accept a provider mapping once docs or a sample response are provided.
+	- Authentication, persistence (database), and user management — intentionally omitted for speed/demonstration.
+	- Background job processing / task queue for long-running AI calls (the app calls Gemini synchronously in the current MVP).
+	- Full frontend polish and accessibility improvements (UI is functional but minimal).
+
+- **Focus & tradeoffs**:
+	- Prioritized an end-to-end demo that works offline (mock data + PDF) and demonstrates the AI and PDF flow rather than finishing a single third-party integration.
+	- Kept the market-data adapter small and swappable so a real provider can be added later with minimal changes.
+
+
 ## Features (MVP)
 
 - Select a ZIP code (mock data for several ZIPs).
